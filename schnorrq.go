@@ -4,7 +4,6 @@ import (
 	"github.com/cloudflare/circl/ecc/fourq"
 	"github.com/cloudflare/circl/xof/k12"
 	"github.com/pkg/errors"
-	"math/big"
 )
 
 func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, error) {
@@ -57,9 +56,9 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 
 	//scalar64 = scalar64 * Rprime
 
-	scalar64BI := new(big.Int).SetBytes(scalar64[:])
+	//scalar64BI := new(big.Int).SetBytes(scalar64[:])
 
-	scalar64BI = multiply(scalar64BI, M_RP)
+	//scalar64BI = multiply(scalar64BI, M_RP)
 
 	return finalHash, nil
 	//TODO: montgomery stuff

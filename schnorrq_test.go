@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/cloudflare/circl/ecc/fourq"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 	"testing"
 )
 
@@ -14,10 +13,8 @@ func getPublicKey(sk [32]byte) ([32]byte, error) {
 
 	p.ScalarBaseMult(&sk)
 
-	pubKey, err := encode(p)
-	if err != nil {
-		return [32]byte{}, errors.Wrap(err, "encoding fourq point to pubkey")
-	}
+	pubKey := [32]byte{}
+	p.Marshal(&pubKey)
 	return pubKey, nil
 }
 

@@ -1,4 +1,4 @@
-module github.com/qubic/schnorrq
+module github.com/qubic/go-schnorrq
 
 go 1.22
 

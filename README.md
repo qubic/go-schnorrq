@@ -15,7 +15,7 @@ Please check later.
 
 package main
 
-import "github.com/qubic/schnorrq"
+import "github.com/qubic/go-schnorrq"
 import "fmt"
 
 func _()  {

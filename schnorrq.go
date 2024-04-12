@@ -1,12 +1,15 @@
-package go_schnorrq
+package schnorrq
 
 import (
+	"fmt"
 	"github.com/cloudflare/circl/ecc/fourq"
 	"github.com/cloudflare/circl/xof/k12"
 	"github.com/pkg/errors"
 )
 
 func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, error) {
+
+	panic("Not implemented yet")
 
 	//Get sub-seed hash
 	subSeedHash, err := K12Hash64(subSeed[:])
@@ -23,7 +26,7 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 
 	slice := temp[32:]
 
-	scalar64, err := K12Hash64(slice)
+	tempHash, err := K12Hash64(slice)
 	if err != nil {
 		return [64]byte{}, errors.Wrap(err, "Creating scalar.")
 	}
@@ -31,12 +34,15 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	//Initialize point
 	var point fourq.Point
 
-	//Use first 32 bytes of scalar for multiplication - Will have to check if this is correct
-	var scalar32 [32]byte
-	copy(scalar32[:], scalar64[:32]) // TODO: verify that this is accurate
+	//Use first 32 bytes of tempHash as scalar for multiplication
+	var scalar [32]byte
+	copy(scalar[:], tempHash[:32])
 
 	//Perform fixed-base multiplication
-	point.ScalarBaseMult(&scalar32)
+	point.ScalarBaseMult(&scalar)
+
+	fmt.Printf("ResultPoint:\n")
+	point.PrintPoint()
 
 	//Get 32-byte array point encoding.
 	var pointEncoding [32]byte
@@ -53,12 +59,6 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	if err != nil {
 		return [64]byte{}, errors.Wrap(err, "Final hash.")
 	}
-
-	//scalar64 = scalar64 * Rprime
-
-	//scalar64BI := new(big.Int).SetBytes(scalar64[:])
-
-	//scalar64BI = multiply(scalar64BI, M_RP)
 
 	return finalHash, nil
 	//TODO: montgomery stuff

@@ -1,4 +1,4 @@
-package go_schnorrq
+package schnorrq
 
 import (
 	"fmt"

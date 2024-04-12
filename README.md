@@ -15,7 +15,7 @@ Please check later.
 
 package main
 
-import "github.com/qubic/go-schnorrq"
+import "github.com/qubic/schnorrq"
 import "fmt"
 
 func _()  {
@@ -25,7 +25,7 @@ func _()  {
 	messageDigest := [32]byte{}
 	publicKey := [32]byte{}
 	
-	err := go_schnorrq.Verify(publicKey, messageDigest, signature)
+	err := schnorrq.Verify(publicKey, messageDigest, signature)
 
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())

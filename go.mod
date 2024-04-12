@@ -1,9 +1,8 @@
-module github.com/qubic/go-schnorrq
+module github.com/qubic/schnorrq
 
 go 1.22
 
-//TODO: remove once circl PR gets accepted
-replace github.com/cloudflare/circl v1.3.7 => /home/linckode/Projects/qubic/circl
+replace github.com/cloudflare/circl v1.3.7 => github.com/linckode/circl v1.3.7
 
 require (
 	github.com/cloudflare/circl v1.3.7

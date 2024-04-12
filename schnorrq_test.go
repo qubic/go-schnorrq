@@ -1,4 +1,4 @@
-package go_schnorrq
+package schnorrq
 
 import (
 	"encoding/hex"
@@ -44,13 +44,23 @@ func TestSign(t *testing.T) {
 		0xde, 0x0b, 0x65, 0x59, 0xbd, 0xa4, 0x6d, 0x1d,
 		0x8d, 0xd2, 0xfc, 0xda, 0x9f, 0xe4, 0xfa, 0xda,
 	}
+
+	subSeed := [32]byte{
+		0x44, 0x53, 0x51, 0x2f, 0x1e, 0xf5, 0x97, 0xb3,
+		0x65, 0xcc, 0x38, 0x4f, 0x0a, 0x2b, 0x10, 0xce,
+		0xb5, 0xc9, 0x4f, 0x51, 0x6b, 0x91, 0x1a, 0xcc,
+		0x8e, 0x8b, 0xc1, 0xb5, 0x5e, 0x64, 0x6c, 0x74,
+	}
+
 	publicKey, _ := getPublicKey(privateKey)
 
 	fmt.Printf("private: %s\n", hex.EncodeToString(privateKey[:]))
 
 	fmt.Printf("public:  %s\n", hex.EncodeToString(publicKey[:]))
 
-	sgn, _ := Sign(privateKey, publicKey, message)
+	fmt.Printf("subseed:  %s\n", hex.EncodeToString(subSeed[:]))
+
+	sgn, _ := Sign(subSeed, publicKey, message)
 
 	fmt.Printf("signature: %s\n", hex.EncodeToString(sgn[:]))
 
@@ -101,6 +111,7 @@ func TestVerify(t *testing.T) {
 
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
+		t.Fail()
 	}
 
 }

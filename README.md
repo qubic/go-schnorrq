@@ -39,5 +39,4 @@ func _()  {
 - [ ] Signature Generation
 - [x] Signature Verification
 - [ ] Tidy up code / tests
-- [ ] Module publishing
 

@@ -42,7 +42,7 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	point.ScalarBaseMult(&scalar)
 
 	fmt.Printf("ResultPoint:\n")
-	point.PrintPoint()
+	//point.PrintPoint()
 
 	//Get 32-byte array point encoding.
 	var pointEncoding [32]byte
@@ -68,7 +68,7 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 func Verify(pubKey [32]byte, messageDigest [32]byte, signature [64]byte) error {
 
 	if (pubKey[15]&0x80 != 0) || (signature[15]&0x80 != 0) || (signature[62]&0xC0 != 0) || signature[63] != 0 {
-		return errors.New("Bad public key.")
+		return errors.New("Bad public key or signature.")
 	}
 
 	//Initialize point

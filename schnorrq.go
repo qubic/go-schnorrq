@@ -1,15 +1,14 @@
 package schnorrq
 
 import (
+	"encoding/hex"
 	"fmt"
-	"github.com/cloudflare/circl/ecc/fourq"
-	"github.com/cloudflare/circl/xof/k12"
+	"github.com/linckode/circl/ecc/fourq"
+	"github.com/linckode/circl/xof/k12"
 	"github.com/pkg/errors"
 )
 
 func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, error) {
-
-	panic("Not implemented yet")
 
 	//Get sub-seed hash
 	subSeedHash, err := K12Hash64(subSeed[:])
@@ -41,7 +40,7 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	//Perform fixed-base multiplication
 	point.ScalarBaseMult(&scalar)
 
-	fmt.Printf("ResultPoint:\n")
+	//fmt.Printf("ResultPoint:\n")
 	//point.PrintPoint()
 
 	//Get 32-byte array point encoding.
@@ -59,6 +58,13 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	if err != nil {
 		return [64]byte{}, errors.Wrap(err, "Final hash.")
 	}
+
+	fmt.Printf("TempHash: %s\n", hex.EncodeToString(tempHash[:]))
+	fmt.Printf("BigRPrime: %s\n", hex.EncodeToString(bigRPrime[:]))
+
+	tH := multiply(tempHash[:32], bigRPrime[:])
+
+	fmt.Printf("TempHash: %s\n", hex.EncodeToString(tH))
 
 	return finalHash, nil
 	//TODO: montgomery stuff

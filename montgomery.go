@@ -1,32 +1,139 @@
 package schnorrq
 
-var (
-	order = [32]byte{
-
-		0x00, 0x29, 0xCB, 0xC1, 0x4E, 0x5E, 0x0A, 0x72,
-		0xF0, 0x53, 0x97, 0x82, 0x9C, 0xBC, 0x14, 0xE5,
-		0xDF, 0xBD, 0x00, 0x4D, 0xFE, 0x0F, 0x79, 0x99,
-		0x2F, 0xB2, 0x54, 0x0E, 0xC7, 0x76, 0x8C, 0xE7,
-	}
-
-	smallRPrime = [32]byte{
-		0xF3, 0x27, 0x02, 0xFD, 0xAF, 0xC1, 0xC0, 0x74,
-		0xBC, 0xE4, 0x09, 0xED, 0x76, 0xB5, 0xDB, 0x21,
-		0xD7, 0x5E, 0x78, 0xB8, 0xD1, 0xFC, 0xDC, 0xF3,
-		0xE1, 0x2F, 0xE5, 0xF0, 0x79, 0xBC, 0x39, 0x29,
-	}
-
-	bigRPrime = [32]byte{
-		0x00, 0x06, 0xA5, 0xF1, 0x6A, 0xC8, 0xF9, 0xD3,
-		0x3D, 0x01, 0xB7, 0xC7, 0x21, 0x36, 0xF6, 0x1C,
-		0x17, 0x3E, 0xA5, 0xAA, 0xEA, 0x6B, 0x38, 0x7D,
-		0xC8, 0x1D, 0xB8, 0x79, 0x5F, 0xF3, 0xD6, 0x21,
-	}
+import (
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"github.com/pkg/errors"
+	"github.com/qubic/go-schnorrq/order"
+	"math/big"
 )
 
-// multiply mc = ma*mb*r' mod order
-func multiply(ma, mb []byte) []byte {
+type Endianness bool
+
+const (
+	LittleEndian Endianness = false
+	BigEndian    Endianness = true
+)
+
+type MontgomeryNumber struct {
+	orderElement order.Element
+	endianness   Endianness
+}
+
+func (number *MontgomeryNumber) FromStandard(array []byte, endian Endianness, doModOrder bool) error {
+
+	if len(array) != 32 {
+		return errors.New("cannot create Montgomery number, input array is not 32 bytes long")
+	}
+
+	var data [32]byte
+	copy(data[:], array[:])
+
+	//If we have to mod order the number first
+	if doModOrder {
+		data = modOrder(data, endian)
+	}
+
+	number.endianness = endian
+	number.orderElement = elementFromStandard(data, endian)
 
 	return nil
-	//return r.Bytes()
+}
+
+func (number *MontgomeryNumber) ToStandard() [32]byte {
+	return elementToStandard(number.orderElement, number.endianness)
+}
+
+func (number *MontgomeryNumber) Mult(ma, mb MontgomeryNumber) {
+
+	var element order.Element
+
+	element.Mul(&ma.orderElement, &mb.orderElement)
+
+	number.orderElement = element
+	number.endianness = ma.endianness
+}
+
+func (number *MontgomeryNumber) Sub(ma, mb MontgomeryNumber) {
+
+	var element order.Element
+
+	element.Sub(&ma.orderElement, &mb.orderElement)
+
+	number.orderElement = element
+	number.endianness = ma.endianness
+}
+
+// Print prints the contents of the MontgomeryNumber
+func (number *MontgomeryNumber) Print(standardRepresentation bool) {
+	printElement(number.orderElement, standardRepresentation)
+}
+
+//Utility functions
+
+func reverseEndianness(array []byte) []byte {
+
+	length := len(array)
+	reverse := make([]byte, length)
+
+	for i := 0; i < length; i++ {
+		reverse[i] = array[length-i-1]
+	}
+	return reverse
+}
+
+func modOrder(array [32]byte, endian Endianness) [32]byte {
+	return elementToStandard(elementFromStandard(array, endian), endian)
+}
+
+//Element functions
+
+func elementFromStandard(array [32]byte, endian Endianness) order.Element {
+	var element order.Element
+
+	switch endian {
+	case BigEndian:
+		element.SetBigInt(new(big.Int).SetBytes(array[:]))
+		break
+
+	case LittleEndian:
+		element.SetBigInt(new(big.Int).SetBytes(reverseEndianness(array[:])))
+		break
+	}
+
+	return element
+
+}
+
+func elementToStandard(element order.Element, endian Endianness) [32]byte {
+	var array [32]byte
+
+	switch endian {
+	case BigEndian:
+		order.BigEndian.PutElement(&array, element)
+		break
+	case LittleEndian:
+		order.LittleEndian.PutElement(&array, element)
+		break
+	}
+	return array
+}
+
+func printElement(element order.Element, standardRepresentation bool) {
+	var array [32]byte
+
+	if !standardRepresentation {
+		binary.LittleEndian.PutUint64((array)[0:8], element[0])
+		binary.LittleEndian.PutUint64((array)[8:16], element[1])
+		binary.LittleEndian.PutUint64((array)[16:24], element[2])
+		binary.LittleEndian.PutUint64((array)[24:32], element[3])
+		fmt.Printf("%s\n", hex.EncodeToString(array[:]))
+		return
+	}
+
+	order.LittleEndian.PutElement(&array, element)
+
+	fmt.Printf("%s\n", hex.EncodeToString(array[:]))
+
 }

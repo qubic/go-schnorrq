@@ -1,8 +1,6 @@
 package schnorrq
 
 import (
-	"encoding/hex"
-	"fmt"
 	"github.com/linckode/circl/ecc/fourq"
 	"github.com/linckode/circl/xof/k12"
 	"github.com/pkg/errors"
@@ -13,21 +11,18 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	//Get sub-seed hash
 	subSeedHash, err := K12Hash64(subSeed[:])
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "Hashing sub-seed.")
+		return [64]byte{}, errors.Wrap(err, "hashing sub-seed")
 	}
 
-	//Initialize temp and fill last 2/3 32-byte parts with the sub subseed hash and message
+	//Initialize temp and fill last 2/3 32-byte parts with the sub sub-seed hash and message
 	var temp [96]byte
 	copy(temp[32:], subSeedHash[32:])
 	copy(temp[64:], messageDigest[:])
 
 	//Create scalar for point multiplication by hashing last 2/3 32-byte parts of temp
-
-	slice := temp[32:]
-
-	tempHash, err := K12Hash64(slice)
+	tempHash, err := K12Hash64(temp[32:])
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "Creating scalar.")
+		return [64]byte{}, errors.Wrap(err, "hashing last 2/3 parts of temp slice")
 	}
 
 	//Initialize point
@@ -40,12 +35,8 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	//Perform fixed-base multiplication
 	point.ScalarBaseMult(&scalar)
 
-	//fmt.Printf("ResultPoint:\n")
-	//point.PrintPoint()
-
 	//Get 32-byte array point encoding.
 	var pointEncoding [32]byte
-
 	point.Marshal(&pointEncoding)
 
 	//Fill first 1/3 32-byte part of temp with point encoding.
@@ -56,19 +47,44 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 
 	finalHash, err := K12Hash64(temp[:])
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "Final hash.")
+		return [64]byte{}, errors.Wrap(err, "hashing temp")
 	}
 
-	fmt.Printf("TempHash: %s\n", hex.EncodeToString(tempHash[:]))
-	fmt.Printf("BigRPrime: %s\n", hex.EncodeToString(bigRPrime[:]))
+	//Normalize tempHash[0-31] and finalHash[0-31]
+	var montgomeryTempHash MontgomeryNumber
+	err = montgomeryTempHash.FromStandard(tempHash[:32], LittleEndian, true)
+	if err != nil {
+		return [64]byte{}, errors.Wrap(err, "tempHash mod order")
+	}
 
-	tH := multiply(tempHash[:32], bigRPrime[:])
+	var montgomeryFinalHash MontgomeryNumber
+	err = montgomeryFinalHash.FromStandard(finalHash[:32], LittleEndian, true)
+	if err != nil {
+		return [64]byte{}, errors.Wrap(err, "finalHash mod order")
+	}
 
-	fmt.Printf("TempHash: %s\n", hex.EncodeToString(tH))
+	//subSeedHash to Montgomery
+	var montgomerySubSeedHash MontgomeryNumber
+	err = montgomerySubSeedHash.FromStandard(subSeedHash[:32], LittleEndian, false)
+	if err != nil {
+		return [64]byte{}, errors.Wrap(err, "SubSeedHash mod order")
+	}
 
-	return finalHash, nil
-	//TODO: montgomery stuff
+	//Perform multiplication
+	montgomerySubSeedHash.Mult(montgomerySubSeedHash, montgomeryFinalHash)
 
+	//Final subtraction
+	montgomerySubSeedHash.Sub(montgomeryTempHash, montgomerySubSeedHash)
+
+	//Assemble signature
+	var signature [64]byte
+	copy(signature[:32], pointEncoding[:])
+
+	subSeedHashArray := montgomerySubSeedHash.ToStandard()
+
+	copy(signature[32:], subSeedHashArray[:])
+
+	return signature, nil
 }
 
 func Verify(pubKey [32]byte, messageDigest [32]byte, signature [64]byte) error {

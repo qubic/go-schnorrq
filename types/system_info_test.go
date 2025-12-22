@@ -3,9 +3,10 @@ package types
 import (
 	"bytes"
 	"encoding/binary"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestSystemInfo_UnmarshallFromReader(t *testing.T) {
@@ -36,7 +37,7 @@ func TestSystemInfo_UnmarshallFromReader(t *testing.T) {
 				TotalSpectrumAmount:               98989898989898,
 				CurrentEntityBalanceDustThreshold: 200,
 				TargetTickVoteSignature:           0xFFAB,
-				Reserve0:                          0,
+				ComputorPacketSignature:           0,
 				Reserve1:                          0,
 				Reserve2:                          0,
 				Reserve3:                          0,

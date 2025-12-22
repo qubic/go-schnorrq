@@ -2,8 +2,9 @@ package types
 
 import (
 	"encoding/binary"
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 type SystemInfo struct {
@@ -33,8 +34,8 @@ type SystemInfo struct {
 	CurrentEntityBalanceDustThreshold uint64
 
 	TargetTickVoteSignature uint32
+	ComputorPacketSignature uint64
 
-	Reserve0 uint64
 	Reserve1 uint64
 	Reserve2 uint64
 	Reserve3 uint64

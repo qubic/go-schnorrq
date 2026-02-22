@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+
 	"io"
 	"net"
 	"time"
@@ -295,6 +296,16 @@ func (qc *Client) GetActiveIpos(ctx context.Context) (types.Ipos, error) {
 	err := qc.sendRequest(ctx, types.ActiveIposRequest, nil, &result)
 	if err != nil {
 		return types.Ipos{}, errors.Wrap(err, "sending req to node")
+	}
+
+	return result, nil
+}
+
+func (qc *Client) GetContractIpo(ctx context.Context, contractIndex uint32) (types.ContractIpo, error) {
+	var result types.ContractIpo
+	err := qc.sendRequest(ctx, types.ContractIpoRequest, contractIndex, &result)
+	if err != nil {
+		return types.ContractIpo{}, errors.Wrapf(err, "requesting contract ipo for contract index %d", contractIndex)
 	}
 
 	return result, nil

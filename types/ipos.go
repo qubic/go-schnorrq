@@ -59,3 +59,30 @@ func (ipos *Ipos) UnmarshallFromReader(r io.Reader) error {
 	return nil
 
 }
+
+type ContractIpo struct {
+	ContractIndex uint32
+	TickNumber    uint32
+	PubKeys       [NumberOfComputors][32]byte
+	Prices        [NumberOfComputors]int64
+}
+
+func (ci *ContractIpo) UnmarshallFromReader(r io.Reader) error {
+	var header RequestResponseHeader
+
+	err := binary.Read(r, binary.BigEndian, &header)
+	if err != nil {
+		return errors.Wrap(err, "reading header")
+	}
+
+	if header.Type != ContractIpoResponse {
+		return errors.Errorf("Invalid header type, expected %d, found %d", ContractIpoResponse, header.Type)
+	}
+
+	err = binary.Read(r, binary.LittleEndian, ci)
+	if err != nil {
+		return errors.Wrap(err, "reading contract ipo data from reader")
+	}
+
+	return nil
+}

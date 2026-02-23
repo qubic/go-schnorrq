@@ -34,6 +34,8 @@ const (
 	SystemInfoResponse       = 47
 	ActiveIposRequest        = 64
 	ActiveIpoResponse        = 65
+	ContractIpoRequest       = 33
+	ContractIpoResponse      = 34
 )
 
 type RequestResponseHeader struct {

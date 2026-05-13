@@ -1,17 +1,15 @@
 module github.com/qubic/go-schnorrq
 
-go 1.22.0
-
-toolchain go1.23.1
+go 1.26
 
 require (
-	github.com/bits-and-blooms/bitset v1.14.3
-	github.com/consensys/gnark-crypto v0.14.0
+	github.com/bits-and-blooms/bitset v1.24.4
+	github.com/consensys/gnark-crypto v0.20.1
 	github.com/leanovate/gopter v0.2.11
 	github.com/linckode/circl v1.3.71
 	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.9.0
-	golang.org/x/sys v0.26.0
+	github.com/stretchr/testify v1.11.1
+	golang.org/x/sys v0.44.0
 )
 
 require (

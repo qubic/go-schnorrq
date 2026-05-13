@@ -3,10 +3,11 @@ package schnorrq
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/qubic/go-schnorrq/order"
 	"math/big"
+
+	"github.com/qubic/go-schnorrq/order"
 )
 
 type Endianness bool

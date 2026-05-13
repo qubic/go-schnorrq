@@ -1,9 +1,11 @@
 package schnorrq
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/linckode/circl/ecc/fourq"
 	"github.com/linckode/circl/xof/k12"
-	"github.com/pkg/errors"
 )
 
 func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, error) {
@@ -11,7 +13,7 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	//Get sub-seed hash
 	subSeedHash, err := K12Hash64(subSeed[:])
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "hashing sub-seed")
+		return [64]byte{}, fmt.Errorf("hashing sub-seed: %w", err)
 	}
 
 	//Initialize temp and fill last 2/3 32-byte parts with the sub sub-seed hash and message
@@ -22,7 +24,7 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 	//Create scalar for point multiplication by hashing last 2/3 32-byte parts of temp
 	tempHash, err := K12Hash64(temp[32:])
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "hashing last 2/3 parts of temp slice")
+		return [64]byte{}, fmt.Errorf("hashing last 2/3 parts of temp slice: %w", err)
 	}
 
 	//Initialize point
@@ -47,27 +49,27 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 
 	finalHash, err := K12Hash64(temp[:])
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "hashing temp")
+		return [64]byte{}, fmt.Errorf("hashing temp: %w", err)
 	}
 
 	//Normalize tempHash[0-31] and finalHash[0-31]
 	var montgomeryTempHash MontgomeryNumber
 	err = montgomeryTempHash.FromStandard(tempHash[:32], LittleEndian, true)
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "tempHash mod order")
+		return [64]byte{}, fmt.Errorf("tempHash mod order: %w", err)
 	}
 
 	var montgomeryFinalHash MontgomeryNumber
 	err = montgomeryFinalHash.FromStandard(finalHash[:32], LittleEndian, true)
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "finalHash mod order")
+		return [64]byte{}, fmt.Errorf("finalHash mod order: %w", err)
 	}
 
 	//subSeedHash to Montgomery
 	var montgomerySubSeedHash MontgomeryNumber
 	err = montgomerySubSeedHash.FromStandard(subSeedHash[:32], LittleEndian, false)
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "SubSeedHash mod order")
+		return [64]byte{}, fmt.Errorf("SubSeedHash mod order: %w", err)
 	}
 
 	//Perform multiplication
@@ -110,7 +112,7 @@ func Verify(pubKey [32]byte, messageDigest [32]byte, signature [64]byte) error {
 
 	tempHash, err := K12Hash64(temp[:])
 	if err != nil {
-		return errors.Wrap(err, "Failed to hash temp while verifying signature.")
+		return fmt.Errorf("Failed to hash temp while verifying signature.: %w", err)
 	}
 
 	signatureSlice := [32]byte{}
@@ -139,12 +141,12 @@ func K12Hash64(data []byte) ([64]byte, error) {
 	h := k12.NewDraft10([]byte{}) // Using K12 for hashing, equivalent to KangarooTwelve(temp, 96, h, 64).
 	_, err := h.Write(data)
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "k12 hashing")
+		return [64]byte{}, fmt.Errorf("k12 hashing: %w", err)
 	}
 	var out = [64]byte{}
 	_, err = h.Read(out[:])
 	if err != nil {
-		return [64]byte{}, errors.Wrap(err, "reading k12 digest")
+		return [64]byte{}, fmt.Errorf("reading k12 digest: %w", err)
 	}
 	return out, nil
 }

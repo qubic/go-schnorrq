@@ -7,7 +7,6 @@ require (
 	github.com/consensys/gnark-crypto v0.20.1
 	github.com/leanovate/gopter v0.2.11
 	github.com/linckode/circl v1.3.71
-	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.44.0
 )

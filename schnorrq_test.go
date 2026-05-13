@@ -3,9 +3,10 @@ package schnorrq
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/linckode/circl/ecc/fourq"
 	"os/exec"
 	"testing"
+
+	"github.com/linckode/circl/ecc/fourq"
 )
 
 func getPublicKey(sk [32]byte) ([32]byte, error) {

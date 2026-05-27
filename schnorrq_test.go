@@ -2,6 +2,7 @@ package schnorrq
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"os/exec"
 	"testing"
@@ -355,6 +356,102 @@ func TestVerify(t *testing.T) {
 		})
 	}
 
+}
+
+// TestVerify_CanonicalS_RejectsMalleatedTwin reproduces the malleability replay
+// vector from the qubic/core QVE finding: take a valid signature (R, s) and
+// compute s' = s + r over the same payload. The byte-only s < 2^246 check used
+// to accept this; the new strict s < curve_order check must reject it.
+func TestVerify_CanonicalS_RejectsMalleatedTwin(t *testing.T) {
+	// TestVerify_2 — known-good, and crucially s + r still fits under 2^246
+	// (some signatures don't have a usable twin under the old byte check; this
+	// one does, which is exactly what makes it a useful regression case).
+	pubKey := [32]byte{
+		0x9e, 0x1a, 0x10, 0x0c, 0xfb, 0x55, 0x6d, 0xef,
+		0x7b, 0xcc, 0x62, 0x52, 0xe4, 0x7d, 0xdf, 0x09,
+		0x85, 0x42, 0x86, 0x37, 0xc3, 0xd1, 0xb3, 0xca,
+		0xa1, 0x6f, 0x33, 0xfd, 0x98, 0x43, 0x8d, 0x94,
+	}
+	msg := [32]byte{
+		0x8a, 0x48, 0x1c, 0x7a, 0xe4, 0xa7, 0xc3, 0x3c,
+		0xa9, 0xa5, 0x1d, 0x64, 0xcf, 0xa1, 0x13, 0xe5,
+		0x10, 0xc2, 0xf7, 0x8f, 0xf5, 0x8d, 0x8b, 0xd4,
+		0x13, 0xfb, 0x6f, 0x49, 0x21, 0xab, 0xce, 0xb7,
+	}
+	sig := [64]byte{
+		0xb2, 0x36, 0xe4, 0xe6, 0x0a, 0x1d, 0x75, 0x94,
+		0x5a, 0x3a, 0xa8, 0x25, 0x95, 0x14, 0xa5, 0x4e,
+		0x0b, 0x16, 0xac, 0x4b, 0xaa, 0x4e, 0x46, 0x6a,
+		0x91, 0x39, 0x53, 0xc3, 0xde, 0xb7, 0xb5, 0x36,
+		0x6b, 0xf2, 0x2f, 0xe3, 0x50, 0xcb, 0x88, 0x22,
+		0xed, 0xa2, 0xfd, 0x16, 0x04, 0xf9, 0x06, 0x2c,
+		0xf2, 0x16, 0xdb, 0xb4, 0x0f, 0x88, 0xec, 0x34,
+		0x17, 0x88, 0x63, 0x89, 0x68, 0xe3, 0x13, 0x00,
+	}
+
+	if err := Verify(pubKey, msg, sig); err != nil {
+		t.Fatalf("baseline signature should verify: %v", err)
+	}
+
+	twin := sig
+	addCurveOrderLE(twin[32:])
+
+	// Sanity: twin still fits the old byte-only check (else it isn't a
+	// regression case for THIS vulnerability).
+	if twin[62]&0xC0 != 0 || twin[63] != 0 {
+		t.Fatalf("malleated twin doesn't bypass the pre-fix byte check; pick a different base signature")
+	}
+
+	if err := Verify(pubKey, msg, twin); err == nil {
+		t.Fatal("malleated twin (s' = s + r) was accepted — canonical-S check is not enforced")
+	}
+}
+
+// TestVerify_CanonicalS_RejectsScalarEqualToOrder pins the boundary: s == r
+// must be rejected (it's outside the canonical [0, r) range).
+func TestVerify_CanonicalS_RejectsScalarEqualToOrder(t *testing.T) {
+	// pubKey/message bytes don't matter — canonical-S check fires before any
+	// curve math. Reuse TestVerify_1's pubKey to keep the high-bit check happy.
+	pubKey := [32]byte{
+		0x1f, 0x59, 0x0d, 0x03, 0xe6, 0x13, 0xbd, 0xde,
+		0xd3, 0x8b, 0x4c, 0x08, 0x20, 0xac, 0x44, 0x61,
+		0x5f, 0x91, 0xaf, 0x12, 0x43, 0x59, 0x80, 0xb3,
+		0xed, 0xe3, 0xc0, 0x8c, 0x31, 0x5a, 0x25, 0x44,
+	}
+	var msg [32]byte
+
+	var sig [64]byte
+	// Bytes 0..31 (the R point) left zero; we never reach the decode step.
+	binary.LittleEndian.PutUint64(sig[32:], 3436901888089820391)
+	binary.LittleEndian.PutUint64(sig[40:], 16122042576031152537)
+	binary.LittleEndian.PutUint64(sig[48:], 17317351579400803557)
+	binary.LittleEndian.PutUint64(sig[56:], 11764505149049458)
+
+	if err := Verify(pubKey, msg, sig); err == nil {
+		t.Fatal("signature with s == curve_order was accepted; expected non-canonical rejection")
+	}
+}
+
+// addCurveOrderLE adds r to the 32-byte little-endian scalar in place, mod 2^256.
+// Used by the malleability test to construct s' = s + r.
+func addCurveOrderLE(s []byte) {
+	r := [4]uint64{
+		3436901888089820391,
+		16122042576031152537,
+		17317351579400803557,
+		11764505149049458,
+	}
+	var carry uint64
+	for i := 0; i < 4; i++ {
+		limb := binary.LittleEndian.Uint64(s[i*8:])
+		sum := limb + r[i] + carry
+		if sum < limb || (carry == 1 && sum == limb) {
+			carry = 1
+		} else {
+			carry = 0
+		}
+		binary.LittleEndian.PutUint64(s[i*8:], sum)
+	}
 }
 
 func BenchmarkVerify(b *testing.B) {

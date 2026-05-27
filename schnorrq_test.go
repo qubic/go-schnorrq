@@ -2,6 +2,7 @@ package schnorrq
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"os/exec"
 	"testing"
@@ -355,6 +356,60 @@ func TestVerify(t *testing.T) {
 		})
 	}
 
+}
+
+// TestVerifyRejectsScalarEqualToCurveOrder is the regression test for the
+// signature-malleability fix: a scalar S exactly equal to the curve order r is
+// non-canonical and must be rejected. Before the canonical-S check, S = r (and
+// any S in [r, 2^246)) slipped past the `S < 2^246` guard, enabling the twin
+// S' = S + r to verify and produce a different tx hash for the same payload.
+func TestVerifyRejectsScalarEqualToCurveOrder(t *testing.T) {
+	// Reuse TestVerify_1's known-good vector as the carrier; we only swap S.
+	pubKey := [32]byte{
+		0x1f, 0x59, 0x0d, 0x03, 0xe6, 0x13, 0xbd, 0xde,
+		0xd3, 0x8b, 0x4c, 0x08, 0x20, 0xac, 0x44, 0x61,
+		0x5f, 0x91, 0xaf, 0x12, 0x43, 0x59, 0x80, 0xb3,
+		0xed, 0xe3, 0xc0, 0x8c, 0x31, 0x5a, 0x25, 0x44,
+	}
+	msg := [32]byte{
+		0xa6, 0x82, 0x8f, 0xcb, 0x9b, 0x68, 0x6f, 0x08,
+		0x74, 0x08, 0x57, 0x2b, 0xf3, 0x16, 0xe8, 0x9b,
+		0x2d, 0x96, 0xfc, 0x48, 0x11, 0xb5, 0xd0, 0x75,
+		0x4b, 0xfd, 0xbd, 0x5b, 0x8a, 0xd7, 0x76, 0x0d,
+	}
+	sig := [64]byte{
+		0x60, 0xce, 0xd0, 0x82, 0xa0, 0x31, 0xb8, 0x97,
+		0x3c, 0x8b, 0x77, 0xe3, 0x9b, 0x07, 0x8c, 0x1e,
+		0xd5, 0x1b, 0xac, 0xf5, 0x95, 0x03, 0xfd, 0x19,
+		0xe8, 0x6c, 0x34, 0x0e, 0xc9, 0x0c, 0x85, 0xa7,
+		0x37, 0x27, 0x53, 0xc3, 0x63, 0x4c, 0xcc, 0x88,
+		0xcc, 0xfa, 0x9f, 0xd0, 0x17, 0xa8, 0x60, 0x59,
+		0x02, 0xde, 0x96, 0xab, 0x0d, 0xba, 0x73, 0x24,
+		0x01, 0x6a, 0xfe, 0x54, 0x52, 0x22, 0x11, 0x00,
+	}
+	if err := Verify(pubKey, msg, sig); err != nil {
+		t.Fatalf("baseline valid signature rejected: %s", err)
+	}
+
+	// Replace S with exactly r (little-endian limbs from order/element.go).
+	atOrder := sig
+	binary.LittleEndian.PutUint64(atOrder[32:40], 3436901888089820391)
+	binary.LittleEndian.PutUint64(atOrder[40:48], 16122042576031152537)
+	binary.LittleEndian.PutUint64(atOrder[48:56], 17317351579400803557)
+	binary.LittleEndian.PutUint64(atOrder[56:64], 11764505149049458)
+	if err := Verify(pubKey, msg, atOrder); err == nil {
+		t.Fatal("S == curve_order accepted (canonical-S check missing)")
+	}
+
+	// S = r + 1 lands inside the malleability gap [r, 2^246); also rejected.
+	gap := sig
+	binary.LittleEndian.PutUint64(gap[32:40], 3436901888089820392) // r0 + 1
+	binary.LittleEndian.PutUint64(gap[40:48], 16122042576031152537)
+	binary.LittleEndian.PutUint64(gap[48:56], 17317351579400803557)
+	binary.LittleEndian.PutUint64(gap[56:64], 11764505149049458)
+	if err := Verify(pubKey, msg, gap); err == nil {
+		t.Fatal("S in [r, 2^246) gap accepted (canonical-S check missing)")
+	}
 }
 
 func BenchmarkVerify(b *testing.B) {

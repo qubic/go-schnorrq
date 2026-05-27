@@ -1,6 +1,7 @@
 package schnorrq
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -91,7 +92,26 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 
 func Verify(pubKey [32]byte, messageDigest [32]byte, signature [64]byte) error {
 
-	if (pubKey[15]&0x80 != 0) || (signature[15]&0x80 != 0) || (signature[62]&0xC0 != 0) || signature[63] != 0 {
+	if (pubKey[15]&0x80 != 0) || (signature[15]&0x80 != 0) {
+		return errors.New("Bad public key or signature.")
+	}
+
+	// Reject non-canonical S: require S < curve order r. The previous check
+	// only enforced S < 2^246, leaving the gap [r, 2^246) accepted; the twin
+	// S' = S + r then verifies for the same (R, pubKey, msg), producing a
+	// different transaction hash and bypassing dedup (double-execution).
+	// q0..q3 are r as little-endian 64-bit limbs (see order/element.go).
+	const (
+		q0 uint64 = 3436901888089820391
+		q1 uint64 = 16122042576031152537
+		q2 uint64 = 17317351579400803557
+		q3 uint64 = 11764505149049458
+	)
+	s0 := binary.LittleEndian.Uint64(signature[32:40])
+	s1 := binary.LittleEndian.Uint64(signature[40:48])
+	s2 := binary.LittleEndian.Uint64(signature[48:56])
+	s3 := binary.LittleEndian.Uint64(signature[56:64])
+	if !(s3 < q3 || (s3 == q3 && (s2 < q2 || (s2 == q2 && (s1 < q1 || (s1 == q1 && s0 < q0)))))) {
 		return errors.New("Bad public key or signature.")
 	}
 

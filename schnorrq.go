@@ -1,12 +1,23 @@
 package schnorrq
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/linckode/circl/ecc/fourq"
 	"github.com/linckode/circl/xof/k12"
 )
+
+// curveOrder is the FourQ subgroup order r as four little-endian uint64 limbs
+// (limb 0 = least significant). Mirrors order.qElement (see order/element.go:55-68)
+// and CURVE_ORDER_{0..3} in qubic/core src/four_q.h.
+var curveOrder = [4]uint64{
+	3436901888089820391,
+	16122042576031152537,
+	17317351579400803557,
+	11764505149049458,
+}
 
 func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, error) {
 
@@ -91,8 +102,30 @@ func Sign(subSeed [32]byte, pubKey [32]byte, messageDigest [32]byte) ([64]byte, 
 
 func Verify(pubKey [32]byte, messageDigest [32]byte, signature [64]byte) error {
 
-	if (pubKey[15]&0x80 != 0) || (signature[15]&0x80 != 0) || (signature[62]&0xC0 != 0) || signature[63] != 0 {
+	if (pubKey[15]&0x80 != 0) || (signature[15]&0x80 != 0) {
 		return errors.New("Bad public key or signature.")
+	}
+
+	// Reject non-canonical scalars (s >= curve_order). Without this, a twin
+	// s' = s + r is also a valid signature on the same payload, producing a
+	// different tx hash and enabling replay/double-execution. Matches the
+	// canonical-S check added in qubic/core commit 05f7348.
+	var s [4]uint64
+	for i := 0; i < 4; i++ {
+		s[i] = binary.LittleEndian.Uint64(signature[32+i*8:])
+	}
+	canonical := false
+	for i := 3; i >= 0; i-- {
+		if s[i] < curveOrder[i] {
+			canonical = true
+			break
+		}
+		if s[i] > curveOrder[i] {
+			break
+		}
+	}
+	if !canonical {
+		return errors.New("Non-canonical signature scalar.")
 	}
 
 	//Initialize point

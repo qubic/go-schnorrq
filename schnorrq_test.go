@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"os/exec"
 	"testing"
 
@@ -476,4 +477,100 @@ func BenchmarkVerifyProgram(b *testing.B) {
 
 	}
 
+}
+
+// pubKeyFromLimbs encodes four little-endian uint64 limbs into a 32-byte public
+// key, matching the limb layout used by decode()/IsWeak().
+func pubKeyFromLimbs(limbs [4]uint64) [32]byte {
+	var pk [32]byte
+	for i := 0; i < 4; i++ {
+		binary.LittleEndian.PutUint64(pk[i*8:], limbs[i])
+	}
+	return pk
+}
+
+// TestVerify_RejectsLowOrderKeys feeds the four canonical low-order public keys
+// from qubic/core PR #921 (kWeakKeys). A zero signature is canonical (S=0 < order)
+// with bit-128 clear, so it clears the earlier guards and the public-key check is
+// what must reject. Asserting the exact reason proves the new check fired, not an
+// incidental one.
+func TestVerify_RejectsLowOrderKeys(t *testing.T) {
+	cases := []struct {
+		name    string
+		limbs   [4]uint64
+		wantErr string
+	}{
+		// Caught by the fast-path identity check (pk[0] is not inspected):
+		{"identity (0,1) order 1", [4]uint64{1, 0, 0, 0}, "Malformed public key."},
+		{"NULL_ID (i,0) order 4", [4]uint64{0, 0, 0, 0}, "Malformed public key."},
+		{"(-i,0) order 4", [4]uint64{0, 0, 0, 0x8000000000000000}, "Malformed public key."},
+		// Survives the fast-path (pk[1] != 0), caught by IsWeak() after decode:
+		{"(0,-1) order 2", [4]uint64{0xFFFFFFFFFFFFFFFE, 0x7FFFFFFFFFFFFFFF, 0, 0}, "Weak (low-order) public key."},
+	}
+
+	var zeroSig [64]byte
+	var msg [32]byte // irrelevant; rejection happens before the digest is used
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Verify(pubKeyFromLimbs(tc.limbs), msg, zeroSig)
+			if err == nil {
+				t.Fatalf("expected rejection of weak key %q, got nil", tc.name)
+			}
+			if err.Error() != tc.wantErr {
+				t.Fatalf("wrong rejection reason: got %q, want %q", err.Error(), tc.wantErr)
+			}
+		})
+	}
+}
+
+// networkForgeries are the real mainnet transactions from qubic/core
+// PR #921 (kNetworkForgeries) that verified on the unpatched node. Layout:
+// bytes[0:32] source public key, last 64 bytes signature (R||S); the verifier
+// digest is K12(tx-without-signature, 32). All seven use the identity source
+// key, so the security property is simply: the current Verify must reject each.
+var networkForgeries = []string{
+	"010000000000000000000000000000000000000000000000000000000000000091cfd01bb1d6b1d48e9f806a8ef65734ae6162fbb3b2643a0088c1046e55f776009435770000000072e878030000000052750c95db608b2ad33f260c13523f3392afdbeefcd071a824e3973403443d890f997c86e5c769fd2344c515a7ce19b4dffc30a06e6da2dab5a1bc09f2212300",
+	"010000000000000000000000000000000000000000000000000000000000000091cfd01bb1d6b1d48e9f806a8ef65734ae6162fbb3b2643a0088c1046e55f776009435770000000060e8780300000000304d8a0eef6d5e578f7fe3623f21d97debd5c1a77a2bad8f347ae4cf41256a61f31cd9c1d5280e2895ba8d3864e7e33cb9197d7e0fca47e38211277fb2960b00",
+	"01000000000000000000000000000000000000000000000000000000000000008220a28587c81abd47934c0f6e8af42d1b10182c494a3d46aa9908eaf83e606a00e40b5402000000e74a7803000000004c1357678e9aa76ef892379f94545e571a1435730c15b5ae366a1f34f9a8fa54834ba3e96e9c5b6407759e470b5ecceb5f233f067bbeecd72ebe0332b11f0200",
+	"01000000000000000000000000000000000000000000000000000000000000008220a28587c81abd47934c0f6e8af42d1b10182c494a3d46aa9908eaf83e606a00f2052a01000000bf487803000000009f660e0561ec753b2d2395ef84a8b305489c091fbba0cfa95f910cc13d56e67f542412901ff6107611d2d4facf038fe73193a3f8b1dff646be0a9100ce752600",
+	"0100000000000000000000000000000000000000000000000000000000000000d4902431eb401facb0e5f4c649b53801c3ad1228ba0294953922d2e662a66da301000000000000008d0d77030000000091f3a7dd1cf60d64a79efac0fe6f034a6848924a08f65d46059387a801761ebafc062f4764555f485fedbd34a7e536889d261582a46325cb5dd1e5b083412300",
+	"01000000000000000000000000000000000000000000000000000000000000004de5b0cd0b1f9638e12b9906cc36a39334835644d958318957bb37b648b5822f01000000000000003917770300000000ef46106b7a44f73e67f857b8b9f66e4c2a0ed960453fe55a4058d0e4c4a052d679d773ae43ec0bc24e200ae4ce28abb5e0a195d45c313358719b0c77ae131c00",
+	"01000000000000000000000000000000000000000000000000000000000000008220a28587c81abd47934c0f6e8af42d1b10182c494a3d46aa9908eaf83e606a01000000000000002b197703000000005cafd8c1dcf05b0eebf805cafb40d361848c13f94ce78640cfdb76fba0cddcde50ce8556637fdac894848fa18b18b5fdcbc49b0719ef505fcafe3100497f2200",
+	"01000000000000000000000000000000000000000000000000000000000000008220a28587c81abd47934c0f6e8af42d1b10182c494a3d46aa9908eaf83e606a00e40b5402000000a0437703000000009573ad5ce6f0e8d8d02a28297334c3009a319580e63c27c5a1b257fe2e056fcc0b8307956b52c223eba07eb5a8a0384ba044626aed71637ef3238ad3ee160c00",
+}
+
+// TestVerify_RejectsNetworkForgeries replays the real network forgeries; the
+// patched Verify must reject every one (pre-patch they were accepted).
+func TestVerify_RejectsNetworkForgeries(t *testing.T) {
+	for i, hexTx := range networkForgeries {
+		t.Run(fmt.Sprintf("forgery_%d", i), func(t *testing.T) {
+			tx, err := hex.DecodeString(hexTx)
+			if err != nil {
+				t.Fatalf("bad hex: %v", err)
+			}
+			if len(tx) < 32+64 {
+				t.Fatalf("tx too short: %d bytes", len(tx))
+			}
+
+			var pubKey [32]byte
+			copy(pubKey[:], tx[:32])
+
+			var sig [64]byte
+			copy(sig[:], tx[len(tx)-64:])
+
+			digest64, err := K12Hash64(tx[:len(tx)-64]) // K12 is an XOF: first 32 == K12(.,32)
+			if err != nil {
+				t.Fatalf("digest: %v", err)
+			}
+			var digest [32]byte
+			copy(digest[:], digest64[:32])
+
+			if err := Verify(pubKey, digest, sig); err == nil {
+				t.Fatalf("forgery %d ACCEPTED — patch ineffective", i)
+			} else {
+				t.Logf("forgery %d rejected: %s", i, err.Error())
+			}
+		})
+	}
 }

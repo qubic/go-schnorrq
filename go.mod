@@ -6,7 +6,7 @@ require (
 	github.com/bits-and-blooms/bitset v1.24.4
 	github.com/consensys/gnark-crypto v0.20.1
 	github.com/leanovate/gopter v0.2.11
-	github.com/linckode/circl v1.3.71
+	github.com/linckode/circl v1.3.72
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.44.0
 )

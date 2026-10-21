@@ -1,6 +1,6 @@
 module github.com/qubic/go-schnorrq
 
-go 1.26.8
+go 1.26.10
 
 require (
 	github.com/bits-and-blooms/bitset v1.26.0

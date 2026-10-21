@@ -1,19 +1,14 @@
 module github.com/qubic/go-schnorrq
 
-go 1.26
+go 1.26.10
 
 require (
-	github.com/bits-and-blooms/bitset v1.24.4
-	github.com/consensys/gnark-crypto v0.20.1
+	github.com/bits-and-blooms/bitset v1.26.0
+	github.com/consensys/gnark-crypto v0.22.0
 	github.com/leanovate/gopter v0.2.11
 	github.com/linckode/circl v1.3.72
-	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.44.0
+	github.com/stretchr/testify v1.12.1
+	golang.org/x/sys v0.49.0
 )
 
-require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
+require go.yaml.in/yaml/v3 v3.0.5 // indirect
